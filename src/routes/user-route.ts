@@ -1,15 +1,14 @@
 import { Elysia, t } from "elysia";
-import { registerUser, loginUser, getCurrentUser } from "../services/user-service";
+import { registerUser, loginUser, logoutUser } from "../services/user-service";
+import { auth } from "../middlewares/auth";
 
 export const userRoutes = new Elysia({ prefix: "/api" })
   .post("/users", async ({ body, set }) => {
-    const { name, email, password } = body;
-
-    const result = await registerUser(name, email, password);
+    const result = await registerUser(body.name, body.email, body.password);
 
     if (!result.success) {
       if (result.reason === "email_exists") {
-        set.status = 400; // Or 409 Conflict
+        set.status = 400;
         return { message: "Email Sudah Terdaftar" };
       }
       set.status = 500;
@@ -26,12 +25,10 @@ export const userRoutes = new Elysia({ prefix: "/api" })
     })
   })
   .post("/users/login", async ({ body, set }) => {
-    const { email, password } = body;
-
-    const result = await loginUser(email, password);
+    const result = await loginUser(body.email, body.password);
 
     if (!result.success) {
-      set.status = 400; // Or 401 Unauthorized
+      set.status = 400;
       return { message: "Email atau Password salah" };
     }
 
@@ -43,34 +40,30 @@ export const userRoutes = new Elysia({ prefix: "/api" })
       password: t.String(),
     })
   })
-  .post("/users/current", async ({ headers, set }) => {
-    const authHeader = headers["authorization"];
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      set.status = 401;
-      return { error: "Unauthorized" };
-    }
-
-    const token = authHeader.split(" ")[1];
-    if (!token) {
-      set.status = 401;
-      return { error: "Unauthorized" };
-    }
-
-    const result = await getCurrentUser(token);
-
-
-    if (!result.success || !result.user) {
+  // Apply auth middleware for protected routes below
+  .use(auth)
+  .post("/users/current", ({ user, set }) => {
+    if (!user) {
       set.status = 401;
       return { error: "Unauthorized" };
     }
 
     set.status = 200;
-    return {
-      data: {
-        id: result.user.id,
-        name: result.user.name,
-        email: result.user.email,
-        createdAt: result.user.createdAt,
-      },
-    };
+    return { data: user };
+  })
+  .delete("/users/logout", async ({ user, token, set }) => {
+    if (!user || !token) {
+      set.status = 401;
+      return { error: "Unauthorized" };
+    }
+
+    const result = await logoutUser(token);
+
+    if (!result.success) {
+      set.status = 401;
+      return { error: "Unauthorized" };
+    }
+
+    set.status = 200;
+    return { data: "OK" };
   });
