@@ -80,3 +80,22 @@ export async function getCurrentUser(token: string) {
   return { success: true, user: result[0] };
 }
 
+export async function logoutUser(token: string) {
+  // Check if session exists
+  const [session] = await db
+    .select()
+    .from(sessions)
+    .where(eq(sessions.token, token))
+    .limit(1);
+
+  if (!session) {
+    return { success: false };
+  }
+
+  // Delete session
+  await db.delete(sessions).where(eq(sessions.token, token));
+
+  return { success: true };
+}
+
+
