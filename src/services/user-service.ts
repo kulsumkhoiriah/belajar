@@ -59,3 +59,24 @@ export async function loginUser(email: string, password: string) {
 
   return { success: true, token };
 }
+
+export async function getCurrentUser(token: string) {
+  const result = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      createdAt: users.createdAt,
+    })
+    .from(sessions)
+    .innerJoin(users, eq(sessions.userId, users.id))
+    .where(eq(sessions.token, token))
+    .limit(1);
+
+  if (result.length === 0) {
+    return { success: false };
+  }
+
+  return { success: true, user: result[0] };
+}
+
